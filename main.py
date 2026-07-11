@@ -67,7 +67,7 @@ async def guest_handler(message: Message, bot: Bot) -> None:
 
 
 async def main() -> None:
-    token = os.environ["BOT_TOKEN"]
+    token = os.environ["8751987231:AAGxS58VSYSL8_3FUSBkHP6DAjZKamQuZ1M"]
     bot = Bot(token=token)
     dp = Dispatcher()
     dp.include_router(router)
