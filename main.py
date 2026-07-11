@@ -1,6 +1,6 @@
 """
 Telegram bot with Guest Mode + Rich Messages support (Bot API 10.0 / 10.1)
-Requires: pip install "aiogram>=3.28" --break-system-packages
+Requires: pip install "aiogram>=3.29" --break-system-packages
 
 Setup in BotFather before running:
   1. /mybots -> your bot -> Bot Settings -> Guest Mode -> Enable
@@ -17,51 +17,32 @@ import os
 
 from aiogram import Bot, Dispatcher, Router
 from aiogram.filters import CommandStart
-from aiogram.types import Message
-from aiogram.methods import AnswerGuestQuery
-
-# Rich message building blocks (aiogram's typed wrappers around the
-# InputRichMessage / RichBlock schema introduced in Bot API 10.1)
-from aiogram.types import (
-    InputRichMessage,
-    RichBlockHeading,
-    RichBlockParagraph,
-    RichBlockList,
-    RichBlockListItem,
-    RichBlockCode,
-)
+from aiogram.types import Message, InputRichMessage
 
 router = Router()
 
 
-def build_welcome_rich_message() -> InputRichMessage:
-    """A structured rich message: heading, paragraph, list, code block."""
-    return InputRichMessage(
-        blocks=[
-            RichBlockHeading(level=2, text="Hey, I'm online 👋"),
-            RichBlockParagraph(
-                text=(
-                    "I can answer you here even though I'm not a member "
-                    "of this chat -- that's Guest Mode."
-                )
-            ),
-            RichBlockList(
-                ordered=False,
-                items=[
-                    RichBlockListItem(text="Ask me anything, one reply per mention"),
-                    RichBlockListItem(text="No chat history access (guest limitation)"),
-                    RichBlockListItem(text="Add me to the chat for full conversations"),
-                ],
-            ),
-            RichBlockCode(language="text", code="/start  -- see this menu again"),
-        ]
+def welcome_markdown(name: str = "there") -> str:
+    """
+    Rich messages are authored as one HTML or Markdown string -- Telegram
+    parses headings, lists, code fences, etc. out of it server-side.
+    (Not a tree of block objects -- that was wrong in an earlier draft.)
+    """
+    return (
+        f"## Hey {name} 👋\n\n"
+        "I can answer you here even though I'm not a member of this chat "
+        "-- that's **Guest Mode**.\n\n"
+        "- Ask me anything, one reply per mention\n"
+        "- No chat history access (guest limitation)\n"
+        "- Add me to the chat for full conversations\n\n"
+        "```\n/start -- see this menu again\n```"
     )
 
 
 @router.message(CommandStart())
 async def start_handler(message: Message, bot: Bot) -> None:
     """Normal /start in a regular chat where the bot IS a member."""
-    rich = build_welcome_rich_message()
+    rich = InputRichMessage(markdown=welcome_markdown(message.from_user.first_name))
     await bot.send_rich_message(chat_id=message.chat.id, rich_message=rich)
 
 
@@ -72,35 +53,21 @@ async def guest_handler(message: Message, bot: Bot) -> None:
     You get exactly one reply via answer_guest_query -- treat it as
     stateless, no history, no follow-ups.
     """
-    guest_query_id = message.guest_query_id
     caller = message.guest_bot_caller_user
-
-    rich = InputRichMessage(
-        blocks=[
-            RichBlockHeading(level=3, text=f"Hi {caller.first_name} 👋"),
-            RichBlockParagraph(
-                text=f"You asked: “{message.text}”. Here's a structured answer:"
-            ),
-            RichBlockList(
-                ordered=True,
-                items=[
-                    RichBlockListItem(text="This reply is one-shot (guest mode limit)"),
-                    RichBlockListItem(text="Add me to the chat for a real conversation"),
-                ],
-            ),
-        ]
+    reply_md = (
+        f"### Hi {caller.first_name} 👋\n\n"
+        f"You asked: *{message.text}*. Here's a structured answer:\n\n"
+        "1. This reply is one-shot (guest mode limit)\n"
+        "2. Add me to the chat for a real conversation\n"
     )
+    rich = InputRichMessage(markdown=reply_md)
 
-    await bot(
-        AnswerGuestQuery(
-            guest_query_id=guest_query_id,
-            rich_message=rich,
-        )
-    )
+    # Shortcut method -- equivalent to calling AnswerGuestQuery directly
+    await message.answer_guest_query(rich_message=rich)
 
 
 async def main() -> None:
-    token = os.environ["8751987231:AAGxS58VSYSL8_3FUSBkHP6DAjZKamQuZ1M"]
+    token = os.environ["BOT_TOKEN"]
     bot = Bot(token=token)
     dp = Dispatcher()
     dp.include_router(router)
